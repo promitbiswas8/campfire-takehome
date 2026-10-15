@@ -133,3 +133,51 @@ def test_skipped_entry_with_unreadable_date_affects_completeness_even_if_draft()
     ledger = ledger_with(entry("JE-1", "2026-02-30", BALANCED, status="draft"))
     [warning] = ledger.warnings
     assert warning.entry_date is None and warning.affects_completeness
+
+
+# --- Review fixes ----------------------------------------------------------------------
+
+@pytest.mark.parametrize("field, value", [("number", 9100), ("name", None), ("type", 1), ("subtype", None)])
+def test_account_fields_must_be_strings(field, value):
+    bad_account = account()
+    bad_account[field] = value
+    with pytest.raises(LedgerError, match="must be text"):
+        load_ledger(raw_ledger(accounts=RAW["accounts"] + [bad_account]))
+
+
+@pytest.mark.parametrize("key", ["accounts", "journal_entries"])
+def test_top_level_lists_must_be_lists(key):
+    data = raw_ledger()
+    data[key] = None
+    with pytest.raises(LedgerError, match="must be a list"):
+        load_ledger(data)
+
+
+@pytest.mark.parametrize(
+    "bad_entry, message",
+    [
+        (entry("JE-1", "2026-01-05", BALANCED, status=["posted"]), "unknown status"),
+        (entry("JE-1", "2026-01-05", [line(["1100"], debit="5.00"), line("4000", credit="5.00")]), "does not exist"),
+    ],
+)
+def test_wrongly_typed_entry_fields_are_excluded_not_crashes(bad_entry, message):
+    ledger = ledger_with(bad_entry)
+    assert ledger.entries == ()
+    [warning] = ledger.warnings
+    assert warning.kind == "skipped" and message in warning.message
+
+
+def test_amount_too_long_to_be_exact_is_excluded():
+    # Decimal keeps 28 significant digits by default; longer sums would be silently rounded.
+    ledger = ledger_with(entry("JE-1", "2026-01-05", [line("1100", debit="1234567890123456.00"),
+                                                      line("4000", credit="1234567890123456.00")]))
+    assert ledger.entries == () and ledger.warnings[0].kind == "skipped"
+    ok = ledger_with(entry("JE-1", "2026-01-05", [line("1100", debit="123456789012345.00"),
+                                                  line("4000", credit="123456789012345.00")]))
+    assert len(ok.entries) == 1
+
+
+def test_duplicate_id_warning_does_not_claim_void_copies_count():
+    ledger = ledger_with(entry("JE-1", "2026-01-05", BALANCED), entry("JE-1", "2026-01-06", BALANCED, status="void"))
+    assert all("All copies are included" not in w.message for w in ledger.warnings)
+    assert all("posted copies are counted" in w.message for w in ledger.warnings)

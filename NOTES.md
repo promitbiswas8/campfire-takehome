@@ -21,7 +21,8 @@ bonus accrual pending approval. If approved, the net loss becomes (49,480.14).
   Zero-activity accounts show 0.00.
 - **Money:** strings are parsed to `Decimal` once at load, never via float. JSON amounts
   are decimal strings (`"-44480.14"`). Every money `sum()` starts at `Decimal("0.00")`,
-  because `sum([])` returns the int `0`.
+  because `sum([])` returns the int `0`. Amounts are capped at 15 digits before the point,
+  so totals stay inside `Decimal`'s 28-digit precision and are never silently rounded.
 - **Bad data is never hidden.** The app refuses to start only if the data can't be trusted
   at all: missing or invalid JSON, or a broken chart of accounts (a duplicate number, an
   unknown type or subtype, or a type that doesn't fit its subtype, which would give

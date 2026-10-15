@@ -20,8 +20,9 @@ TYPES_BY_SUBTYPE = {
 ACCOUNT_TYPES = {"asset", "liability", "equity", "revenue", "expense"}
 STATUSES = {"posted", "draft", "void"}
 
-# [0-9] rather than \d, because \d also matches non-ASCII digits.
-AMOUNT_PATTERN = re.compile(r"[0-9]+\.[0-9]{2}")
+# [0-9] rather than \d, because \d also matches non-ASCII digits. Amounts are capped at
+# 15 digits before the point so sums stay inside Decimal's 28-digit precision, exactly.
+AMOUNT_PATTERN = re.compile(r"[0-9]{1,15}\.[0-9]{2}")
 DATE_PATTERN = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 ZERO = Decimal("0.00")
@@ -107,6 +108,9 @@ def load_ledger(data: dict) -> Ledger:
     for key in ("company", "currency", "accounts", "journal_entries"):
         if key not in data:
             raise LedgerError(f"Ledger is missing {key!r}")
+    for key in ("accounts", "journal_entries"):
+        if not isinstance(data[key], list):
+            raise LedgerError(f"Ledger {key!r} must be a list")
 
     accounts = _load_accounts(data["accounts"])
     entries = []
@@ -140,6 +144,9 @@ def _load_accounts(raw_accounts: list) -> dict[str, Account]:
             )
         except (KeyError, TypeError):
             raise LedgerError(f"Account is missing a field: {raw!r}")
+        for field in ("number", "name", "type", "subtype"):
+            if not isinstance(getattr(account, field), str):
+                raise LedgerError(f"Account {raw!r}: {field} must be text")
         if account.number in accounts:
             raise LedgerError(f"Account {account.number} is defined twice")
         if account.type not in ACCOUNT_TYPES:
@@ -161,7 +168,7 @@ def _load_entry(raw: object, accounts: dict[str, Account]) -> tuple[JournalEntry
         raw = {}
     entry_id = raw.get("id") if isinstance(raw.get("id"), str) else None
     entry_date = parse_iso_date(raw.get("date"))
-    status = raw.get("status")
+    status = raw.get("status") if isinstance(raw.get("status"), str) else None
     memo = raw.get("memo")
     raw_lines = raw.get("lines")
 
@@ -171,7 +178,7 @@ def _load_entry(raw: object, accounts: dict[str, Account]) -> tuple[JournalEntry
     if entry_date is None:
         problems.append(f"date {raw.get('date')!r} is not a valid YYYY-MM-DD date")
     if status not in STATUSES:
-        problems.append(f"unknown status {status!r}")
+        problems.append(f"unknown status {raw.get('status')!r}")
     if not isinstance(memo, str):
         problems.append("missing memo")
 
@@ -216,7 +223,7 @@ def _load_line(raw: object, accounts: dict[str, Account]) -> tuple[Line | None, 
         return None, ["is not an object"]
     problems = []
     account = raw.get("account")
-    if account not in accounts:
+    if not isinstance(account, str) or account not in accounts:
         problems.append(f"account {account!r} does not exist")
     debit = parse_amount(raw.get("debit"))
     if debit is None:
@@ -238,7 +245,7 @@ def _duplicate_id_warnings(entries: list[JournalEntry]) -> list[DataWarning]:
             entry.id,
             entry.date,
             "advisory",
-            f"{entry.id} appears {counts[entry.id]} times. All copies are included.",
+            f"{entry.id} appears {counts[entry.id]} times. All posted copies are counted.",
             False,
         )
         for entry in entries
