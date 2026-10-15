@@ -116,3 +116,22 @@ def test_page_escapes_html_in_memos(monkeypatch):
               memo="<script>alert(1)</script>")))
     page = client.get("/", params={"start": "2026-01-01", "end": "2026-01-31"}).text
     assert "&lt;script&gt;" in page and "<script>alert" not in page
+
+
+def test_complete_statement_has_no_banner():
+    body = get_json("2026-01-01", "2026-03-31").json()
+    assert body["is_complete"] is True and body["warnings"] == []
+    assert "Incomplete statement" not in client.get("/").text
+
+
+def test_incomplete_statement_banner(monkeypatch):
+    bad = ledger_with(
+        entry("JE-1", "2026-01-05", [line("6000", debit="10.00"), line("1000", credit="1.00")]),
+        entry("JE-2", "2026-01-06", [line("6000", debit="abc"), line("1000", credit="1.00")]),
+    )
+    monkeypatch.setattr(main, "ledger", bad)
+    body = get_json("2026-01-01", "2026-01-31").json()
+    assert body["is_complete"] is False and len(body["warnings"]) == 2
+    page = client.get("/", params={"start": "2026-01-01", "end": "2026-01-31"}).text
+    assert "Incomplete statement: some entries could not be included" in page
+    assert "Incomplete statement: included posted entries do not balance" in page

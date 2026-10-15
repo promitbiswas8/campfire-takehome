@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from app.ledger import Account, JournalEntry, Ledger, Line
+from app.ledger import Account, DataWarning, JournalEntry, Ledger, Line
 
 ZERO = Decimal("0.00")
 
@@ -60,6 +60,10 @@ class IncomeStatement:
     operating_income: Decimal
     net_income: Decimal
     excluded_entries: tuple[ExcludedEntry, ...]
+    warnings: tuple[DataWarning, ...]
+    is_complete: bool
+    has_skipped_entries: bool
+    has_unbalanced_entries: bool
 
     def section(self, key: str) -> Section:
         return next(section for section in self.sections if section.key == key)
@@ -105,6 +109,11 @@ def compute_income_statement(ledger: Ledger, start: date, end: date) -> IncomeSt
     operating_income = gross_profit - totals["operating_expenses"]
     net_income = operating_income + totals["other_income"]
 
+    warnings = tuple(
+        warning
+        for warning in ledger.warnings
+        if warning.entry_date is None or start <= warning.entry_date <= end
+    )
     return IncomeStatement(
         company=ledger.company,
         currency=ledger.currency,
@@ -115,6 +124,12 @@ def compute_income_statement(ledger: Ledger, start: date, end: date) -> IncomeSt
         operating_income=operating_income,
         net_income=net_income,
         excluded_entries=excluded,
+        warnings=warnings,
+        is_complete=not any(warning.affects_completeness for warning in warnings),
+        has_skipped_entries=any(
+            warning.kind == "skipped" and warning.affects_completeness for warning in warnings
+        ),
+        has_unbalanced_entries=any(warning.kind == "unbalanced" for warning in warnings),
     )
 
 

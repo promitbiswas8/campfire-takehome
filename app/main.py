@@ -104,6 +104,17 @@ def statement_to_json(statement: IncomeStatement) -> dict:
             {"id": entry.id, "date": entry.date.isoformat(), "status": entry.status, "memo": entry.memo}
             for entry in statement.excluded_entries
         ],
+        "is_complete": statement.is_complete,
+        "warnings": [
+            {
+                "entry_id": warning.entry_id,
+                "entry_date": warning.entry_date.isoformat() if warning.entry_date else None,
+                "kind": warning.kind,
+                "message": warning.message,
+                "affects_completeness": warning.affects_completeness,
+            }
+            for warning in statement.warnings
+        ],
     }
 
 

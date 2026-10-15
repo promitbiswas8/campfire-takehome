@@ -276,3 +276,43 @@ def test_drill_down_is_sorted_by_date_then_id():
     )
     product = statement("2026-01-01", "2026-01-31", ledger).section("revenue").accounts[0]
     assert [e.id for e in product.entries] == ["JE-3", "JE-1", "JE-2"]
+
+
+# --- Completeness ----------------------------------------------------------------------
+
+def test_real_ledger_is_complete_with_no_warnings():
+    result = statement("2025-01-01", "2026-12-31")
+    assert result.is_complete and result.warnings == ()
+
+
+def test_unbalanced_posted_entry_makes_its_range_incomplete():
+    ledger = ledger_with(entry("JE-1", "2026-02-10", [line("6000", debit="18500.00"), line("1000", credit="1850.00")]))
+    february = statement("2026-02-01", "2026-02-28", ledger)
+    assert not february.is_complete and february.has_unbalanced_entries
+    assert amount(february, "6000") == Decimal("18500.00")  # included as recorded
+    assert statement("2026-01-01", "2026-01-31", ledger).is_complete
+
+
+def test_skipped_posted_entry_makes_its_range_incomplete():
+    ledger = ledger_with(entry("JE-1", "2026-02-10", [line("6000", debit="abc"), line("1000", credit="5.00")]))
+    february = statement("2026-02-01", "2026-02-28", ledger)
+    assert not february.is_complete and february.has_skipped_entries
+    assert statement("2026-01-01", "2026-01-31", ledger).is_complete
+
+
+def test_unreadable_date_makes_every_range_incomplete():
+    ledger = ledger_with(entry("JE-1", "2026-02-30", [line("6000", debit="5.00"), line("1000", credit="5.00")]))
+    assert not statement("2026-01-01", "2026-01-31", ledger).is_complete
+    assert not statement("2030-01-01", "2030-01-31", ledger).is_complete
+
+
+def test_skipped_draft_with_readable_date_does_not_affect_completeness():
+    ledger = ledger_with(entry("JE-1", "2026-02-10", [line("6000", debit="abc"), line("1000", credit="5.00")],
+                               status="draft"))
+    february = statement("2026-02-01", "2026-02-28", ledger)
+    assert february.is_complete and len(february.warnings) == 1
+
+
+def test_ordinary_drafts_and_voids_do_not_affect_completeness():
+    result = statement("2026-01-01", "2026-03-31")
+    assert result.excluded_entries and result.is_complete

@@ -31,6 +31,19 @@
   {% endif %}
 
   {% if statement %}
+    {% if not statement.is_complete %}
+      <div class="warning incomplete">
+        {% if statement.has_skipped_entries %}<p><strong>Incomplete statement: some entries could not be included.</strong></p>{% endif %}
+        {% if statement.has_unbalanced_entries %}<p><strong>Incomplete statement: included posted entries do not balance.</strong></p>{% endif %}
+      </div>
+    {% endif %}
+    {% if statement.warnings %}
+      <div class="warning">
+        <p>Data warnings:</p>
+        <ul>{% for warning in statement.warnings %}<li>{{ warning.message }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
     <h1>{{ statement.company }}</h1>
     <h2>Income Statement</h2>
     <p>For the period {{ statement.start | long_date }} to {{ statement.end | long_date }}<br>({{ statement.currency }})</p>
