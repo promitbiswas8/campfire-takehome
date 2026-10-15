@@ -6,13 +6,19 @@ Built and tested with Python 3.14.6 on macOS. Dependencies and versions are pinn
 `requirements.txt` (FastAPI 0.143.1, Jinja2 3.1.6, uvicorn 0.54.0, pytest 9.1.1, httpx2 2.13.1).
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+make run     # sets up .venv on first run, then starts the app
+make test    # runs all tests
+```
 
-uvicorn app.main:app --reload     # page: http://127.0.0.1:8000/
-                                  # JSON: http://127.0.0.1:8000/income-statement?start=2026-01-01&end=2026-03-31
-pytest                            # all tests
+- Page: http://127.0.0.1:8000/
+- JSON: http://127.0.0.1:8000/income-statement?start=2026-01-01&end=2026-03-31
+
+`make run PORT=8001` uses another port. Without `make`:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+uvicorn app.main:app --reload
+pytest
 ```
 
 The backend and the frontend are one process: `/` is a server-rendered page and
