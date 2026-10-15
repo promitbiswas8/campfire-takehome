@@ -179,3 +179,44 @@ def test_entry_order_in_the_file_does_not_matter():
     random.Random(0).shuffle(entries)
     shuffled = dataclasses.replace(LEDGER, entries=tuple(entries))
     assert statement("2025-01-01", "2026-12-31", shuffled) == statement("2025-01-01", "2026-12-31")
+
+
+# --- Checks that must hold for every range ---------------------------------------------
+
+def raw_net_income(start, end):
+    """Independent of the app: sum credit - debit over P&L lines, straight from the JSON."""
+    total = Decimal("0.00")
+    for raw_entry in RAW["journal_entries"]:
+        if raw_entry["status"] == "posted" and start.isoformat() <= raw_entry["date"] <= end.isoformat():
+            for raw_line in raw_entry["lines"]:
+                if raw_line["account"] in PNL_ACCOUNTS:
+                    total += Decimal(raw_line["credit"]) - Decimal(raw_line["debit"])
+    return total
+
+
+@pytest.mark.parametrize("start, end", RANGES)
+def test_net_income_matches_raw_lines(start, end):
+    assert compute_income_statement(LEDGER, start, end).net_income == raw_net_income(start, end)
+
+
+@pytest.mark.parametrize("start, end", RANGES)
+def test_parts_add_up(start, end):
+    result = compute_income_statement(LEDGER, start, end)
+    for section in result.sections:
+        assert sum((a.amount for a in section.accounts), Decimal("0")) == section.total
+
+
+@pytest.mark.parametrize("start, end", RANGES)
+def test_splitting_a_range_adds_up(start, end):
+    whole = flatten(compute_income_statement(LEDGER, start, end))
+    for split in LEDGER_DATES:
+        if start <= split < end:
+            left = flatten(compute_income_statement(LEDGER, start, split))
+            right = flatten(compute_income_statement(LEDGER, split + timedelta(days=1), end))
+            assert {key: str(Decimal(left[key]) + Decimal(right[key])) for key in whole} == whole
+
+
+@pytest.mark.parametrize("start, end", RANGES)
+def test_only_profit_and_loss_accounts_are_listed(start, end):
+    result = compute_income_statement(LEDGER, start, end)
+    assert {a.number for s in result.sections for a in s.accounts} == PNL_ACCOUNTS
