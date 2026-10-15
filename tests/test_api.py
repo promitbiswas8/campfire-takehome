@@ -96,3 +96,23 @@ def test_page_shows_date_errors_instead_of_a_statement(params):
     response = client.get("/", params=params)
     assert response.status_code == 422
     assert 'class="error"' in response.text and "Net loss" not in response.text
+
+
+def test_json_drill_down_and_excluded_entries():
+    body = get_json("2026-01-01", "2026-03-31").json()
+    assert body["sections"][0]["accounts"][0]["entries"][0] == {
+        "id": "JE-002", "date": "2026-01-05", "memo": "January product sales", "amount": "12450.75"}
+    assert [e["id"] for e in body["excluded_entries"]] == ["JE-009", "JE-019", "JE-025"]
+
+
+def test_page_shows_drill_down_and_excluded_entries():
+    page = client.get("/").text
+    assert "JE-018" in page and "Not included: 1 draft, 2 void" in page
+
+
+def test_page_escapes_html_in_memos(monkeypatch):
+    monkeypatch.setattr(main, "ledger", ledger_with(
+        entry("JE-1", "2026-01-05", [line("1100", debit="5.00"), line("4000", credit="5.00")],
+              memo="<script>alert(1)</script>")))
+    page = client.get("/", params={"start": "2026-01-01", "end": "2026-01-31"}).text
+    assert "&lt;script&gt;" in page and "<script>alert" not in page

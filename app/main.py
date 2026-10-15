@@ -77,7 +77,20 @@ def statement_to_json(statement: IncomeStatement) -> dict:
                 "key": section.key,
                 "title": section.title,
                 "accounts": [
-                    {"number": account.number, "name": account.name, "amount": str(account.amount)}
+                    {
+                        "number": account.number,
+                        "name": account.name,
+                        "amount": str(account.amount),
+                        "entries": [
+                            {
+                                "id": entry.id,
+                                "date": entry.date.isoformat(),
+                                "memo": entry.memo,
+                                "amount": str(entry.amount),
+                            }
+                            for entry in account.entries
+                        ],
+                    }
                     for account in section.accounts
                 ],
                 "total": str(section.total),
@@ -87,6 +100,10 @@ def statement_to_json(statement: IncomeStatement) -> dict:
         "gross_profit": str(statement.gross_profit),
         "operating_income": str(statement.operating_income),
         "net_income": str(statement.net_income),
+        "excluded_entries": [
+            {"id": entry.id, "date": entry.date.isoformat(), "status": entry.status, "memo": entry.memo}
+            for entry in statement.excluded_entries
+        ],
     }
 
 

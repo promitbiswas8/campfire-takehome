@@ -220,3 +220,59 @@ def test_splitting_a_range_adds_up(start, end):
 def test_only_profit_and_loss_accounts_are_listed(start, end):
     result = compute_income_statement(LEDGER, start, end)
     assert {a.number for s in result.sections for a in s.accounts} == PNL_ACCOUNTS
+
+
+# --- Drill-down and excluded entries ---------------------------------------------------
+
+@pytest.mark.parametrize("start, end", RANGES)
+def test_entries_add_up_to_their_account(start, end):
+    result = compute_income_statement(LEDGER, start, end)
+    for section in result.sections:
+        for account in section.accounts:
+            assert sum((e.amount for e in account.entries), Decimal("0")) == account.amount
+
+
+@pytest.mark.parametrize("start, end", RANGES)
+def test_only_posted_in_range_entries_are_counted(start, end):
+    result = compute_income_statement(LEDGER, start, end)
+    raw_by_id = {e["id"]: e for e in RAW["journal_entries"]}
+    for section in result.sections:
+        for account in section.accounts:
+            for row in account.entries:
+                assert raw_by_id[row.id]["status"] == "posted"
+                assert start <= row.date <= end
+    for excluded in result.excluded_entries:
+        assert excluded.status in ("draft", "void")
+        assert start <= excluded.date <= end
+
+
+def test_drill_down_lists_the_entries_behind_an_account():
+    software = next(a for a in statement("2026-03-01", "2026-03-31").section("operating_expenses").accounts
+                    if a.number == "6200")
+    assert [(e.id, str(e.amount)) for e in software.entries] == [("JE-018", "1199.97"), ("JE-020", "-100.00")]
+
+
+def test_q1_excluded_entries():
+    result = statement("2026-01-01", "2026-03-31")
+    assert [(e.id, e.status) for e in result.excluded_entries] == [
+        ("JE-009", "void"), ("JE-019", "draft"), ("JE-025", "void")]
+
+
+def test_several_lines_to_one_account_in_one_entry_become_one_row():
+    ledger = ledger_with(entry("JE-1", "2026-01-05", [
+        line("1100", debit="300.00"),
+        line("4000", credit="100.00"),
+        line("4000", credit="200.00"),
+    ]))
+    product = statement("2026-01-01", "2026-01-31", ledger).section("revenue").accounts[0]
+    assert [(e.id, str(e.amount)) for e in product.entries] == [("JE-1", "300.00")]
+
+
+def test_drill_down_is_sorted_by_date_then_id():
+    ledger = ledger_with(
+        entry("JE-2", "2026-01-05", [line("1100", debit="2.00"), line("4000", credit="2.00")]),
+        entry("JE-3", "2026-01-01", [line("1100", debit="3.00"), line("4000", credit="3.00")]),
+        entry("JE-1", "2026-01-05", [line("1100", debit="1.00"), line("4000", credit="1.00")]),
+    )
+    product = statement("2026-01-01", "2026-01-31", ledger).section("revenue").accounts[0]
+    assert [e.id for e in product.entries] == ["JE-3", "JE-1", "JE-2"]

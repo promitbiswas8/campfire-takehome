@@ -40,7 +40,20 @@
         <tr class="heading"><td colspan="2">{{ section.title }}</td></tr>
         {% for account in section.accounts %}
           <tr class="account">
-            <td>{{ account.number }} {{ account.name }}</td>
+            <td>
+              {% if account.entries %}
+                <details>
+                  <summary>{{ account.number }} {{ account.name }}</summary>
+                  <table class="entries">
+                    {% for entry in account.entries %}
+                      <tr><td>{{ entry.id }}</td><td>{{ entry.date }}</td><td>{{ entry.memo }}</td><td class="amount">{{ entry.amount | money }}</td></tr>
+                    {% endfor %}
+                  </table>
+                </details>
+              {% else %}
+                {{ account.number }} {{ account.name }}
+              {% endif %}
+            </td>
             <td class="amount">{{ account.amount | money }}</td>
           </tr>
         {% endfor %}
@@ -56,6 +69,17 @@
       {% endfor %}
       <tr class="result net"><td>{% if statement.net_income < 0 %}Net loss{% else %}Net income{% endif %}</td><td class="amount">{{ statement.net_income | money }}</td></tr>
     </table>
+
+    {% if statement.excluded_entries %}
+      {% set drafts = statement.excluded_entries | selectattr("status", "equalto", "draft") | list %}
+      {% set voids = statement.excluded_entries | selectattr("status", "equalto", "void") | list %}
+      <h3>Not included: {{ drafts | length }} draft, {{ voids | length }} void</h3>
+      <ul>
+        {% for entry in statement.excluded_entries %}
+          <li>{{ entry.id }} ({{ entry.status }}, {{ entry.date }}): {{ entry.memo }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   {% endif %}
 </body>
 </html>
