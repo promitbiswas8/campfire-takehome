@@ -56,7 +56,7 @@ bonus accrual pending approval. If approved, the net loss becomes (49,480.14).
 ## Where AI helped, and where I didn't trust it
 
 I used two separate LLM agents throughout. A primary agent (Claude Opus 5.5) handled
-design and coding, and a secondary agent reviewed, audited and tested its work. Keeping
+design and coding, and a secondary agent (GPT-6-Astra) reviewed, audited and tested its work. Keeping
 the auditor separate guards against the classic single-agent failure: editing the tests
 until they pass.
 
