@@ -27,13 +27,14 @@ bonus accrual pending approval. If approved, the net loss becomes (49,480.14).
   at all: missing or invalid JSON, or a broken chart of accounts (a duplicate number, an
   unknown type or subtype, or a type that doesn't fit its subtype, which would give
   contradictory signs). A readable but wrong entry (posted and unbalanced, or two posted
-  entries sharing an id, which may be one entry counted twice) is included and warned. An unreadable entry (an amount like `NaN`, `1e3` or `-5.00`, an unknown account
-  or status, a bad date, too few lines) is left out whole and warned. When a warning could
+  entries sharing an id, which may be one entry counted twice) is included and warned. An
+  unreadable entry (an amount like `NaN`, `1e3` or `-5.00`, an unknown account or status,
+  a bad date, too few lines) is left out whole and warned. When a warning could
   change the totals, `is_complete` is false and the page shows a banner. Only posted
   entries must balance.
 - **Dates:** our own validator requires exact `YYYY-MM-DD`, a real date, and
-  `start <= end`; anything else gets a 422. FastAPI's and `fromisoformat`'s parsing is more
-  lenient (it accepts `20260101`).
+  `start <= end`; anything else gets a 422. The built-in parsers are more lenient:
+  `date.fromisoformat` accepts `20260101`, and FastAPI accepts a Unix timestamp.
 - **Shape:** one FastAPI app. `/income-statement` (JSON) and `/` (HTML) both call the pure
   `compute_income_statement`. Each account drills down to its entries. No database, because
   SQLite has no exact decimal type. Labels follow accounting convention: Net revenue,
@@ -48,23 +49,48 @@ bonus accrual pending approval. If approved, the net loss becomes (49,480.14).
   accounts, accounts sum to sections, and splitting a range anywhere gives parts that add up.
 - One named test per trap (void, draft, both boundaries, contra, vendor credit, inactive,
   deferred revenue, zero rows, shuffled input), plus 422s and bad-data cases.
-- Broke the code on purpose, and each mistake was caught: flipped sign rule (154 tests
+- Broke the code on purpose, and each mistake was caught: flipped sign rule (155 tests
   failed), exclusive end date (255), counting drafts (137), contra treated as expense (109),
   dropping the `Decimal("0.00")` sum start (7).
 
 ## Where AI helped, and where I didn't trust it
 
-AI (Claude Code) wrote most of the code and tests, from a design I worked through with it
-one decision at a time. It got things wrong that I caught, or that testing caught:
-- It first recommended signing by *section*, contradicting the README's type-based rule.
-  I pushed back. We followed the README and made the mismatch case fatal instead.
-- It first proposed crashing the app on an unbalanced entry. An accountant shouldn't lose
-  every report over one entry, so it became "include and warn".
-- It relied on FastAPI's default date parsing, which accepts formats the README doesn't,
-  so we replaced it with an explicit validator. A second review caught that `Decimal`
-  parses `"NaN"` and `"1e3"` without complaint.
+I used two separate LLM agents throughout. A primary agent (Claude Opus 5.5) handled
+design and coding, and a secondary agent reviewed, audited and tested its work. Keeping
+the auditor separate guards against the classic single-agent failure: editing the tests
+until they pass.
+
+- **Design.** I worked through the design with the primary agent one decision at a time,
+  and used it to answer my questions, with `ACCOUNTING_PRIMER.md` as context. I checked
+  each decision against my own judgment, then had the secondary agent audit the result.
+  That audit caught that Python's `Decimal` quietly accepts strings like `"NaN"` and
+  `"1e3"`, which led to strict amount parsing.
+- **Tests and final verification** followed the same pattern: the primary agent wrote
+  them, then the secondary agent and I audited them. The final review found that an
+  unquoted account number made every request fail with a 500. It was fixed with a test
+  written first.
+- **Pushing back.** Mostly during design, I had to push back on claims and decisions. The
+  agent first recommended signing amounts by section, contradicting the README's
+  type-based rule. It first proposed crashing the app on an unbalanced entry, where an
+  accountant would rather see the report with a warning. It also treated two posted
+  entries with the same id as harmless, when one may be a double count. To its credit, it
+  generally flagged the decisions it was unsure about.
+
+Writing the code is the straightforward part with a coding agent, given a strong test
+suite and a manual review. With more time, I would review more of the code line by line
+myself.
 
 ## Next steps
 
-Comparative periods side by side; a balance sheet from the same ledger; an "include drafts"
-preview; reloading the ledger without a restart, or moving it into storage for edits.
+- **Side-by-side periods** (Jan | Feb | Mar | Q1): call the pure `compute_income_statement`
+  once per period and add columns. The most likely next request.
+- **Preview with drafts:** a clearly labeled "if approved" view. JE-019 would take the Q1
+  loss to (49,480.14).
+- **Margins and % of revenue:** the first division in the app, so it needs a rounding rule
+  (round once, at display, to 0.1%).
+- **Balance sheet:** same loader and signs, but cumulative to a date, with net income rolled
+  into retained earnings.
+- **Generated test ledgers** (`hypothesis`): run the every-range checks on random balanced
+  ledgers, not only on the real one.
+- **Prepaid rent:** if it should be spread at $3,000/month, that's an adjusting entry in the
+  books, not report logic. The report stays "as recorded".
