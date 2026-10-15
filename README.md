@@ -1,5 +1,26 @@
 # Take-home: an income statement
 
+## Running it
+
+Built and tested with Python 3.14.6 on macOS. Dependencies and versions are pinned in
+`requirements.txt` (FastAPI 0.143.1, Jinja2 3.1.6, uvicorn 0.54.0, pytest 9.1.1, httpx2 2.13.1).
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+uvicorn app.main:app --reload     # page: http://127.0.0.1:8000/
+                                  # JSON: http://127.0.0.1:8000/income-statement?start=2026-01-01&end=2026-03-31
+pytest                            # all tests
+```
+
+The backend and the frontend are one process: `/` is a server-rendered page and
+`/income-statement` is the JSON API. `ledger.json` is read once at startup, so restart the
+server after editing it. Design: `docs/design.md`. Decisions and checks: `NOTES.md`.
+
+---
+
 | | |
 | --- | --- |
 | Track | Full-stack, backend, product-leaning |
