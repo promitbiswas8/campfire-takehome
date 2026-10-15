@@ -77,7 +77,10 @@ def signed_amount(account: Account, line: Line) -> Decimal:
 
 
 def entry_sort_key(entry: JournalEntry):
-    return (entry.date, entry.id)
+    # Date, then id. Memo and line contents only break ties between duplicate ids,
+    # so the order never depends on the order of the file.
+    lines = tuple((line.account, line.debit, line.credit) for line in entry.lines)
+    return (entry.date, entry.id, entry.memo, lines)
 
 
 def compute_income_statement(ledger: Ledger, start: date, end: date) -> IncomeStatement:

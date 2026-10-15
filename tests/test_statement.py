@@ -316,3 +316,11 @@ def test_skipped_draft_with_readable_date_does_not_affect_completeness():
 def test_ordinary_drafts_and_voids_do_not_affect_completeness():
     result = statement("2026-01-01", "2026-03-31")
     assert result.excluded_entries and result.is_complete
+
+
+def test_duplicate_ids_sort_the_same_whatever_the_file_order():
+    a = entry("JE-1", "2026-01-05", [line("1100", debit="1.00"), line("4000", credit="1.00")], memo="b")
+    b = entry("JE-1", "2026-01-05", [line("1100", debit="2.00"), line("4000", credit="2.00")], memo="a")
+    forward = statement("2026-01-01", "2026-01-31", ledger_with(a, b))
+    backward = statement("2026-01-01", "2026-01-31", ledger_with(b, a))
+    assert forward.section("revenue").accounts[0].entries == backward.section("revenue").accounts[0].entries
