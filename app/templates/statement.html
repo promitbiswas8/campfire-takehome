@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Income statement</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 0.2rem 0.4rem; vertical-align: top; }
+    td.amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    tr.heading td { font-weight: bold; padding-top: 1rem; }
+    tr.account td:first-child { padding-left: 1.5rem; }
+    tr.total td { font-weight: bold; border-top: 1px solid #999; }
+    tr.result td { font-weight: bold; border-top: 1px solid #333; }
+    tr.net td { border-bottom: 3px double #333; }
+    .entries { font-size: 0.85rem; color: #444; }
+    .error, .warning { padding: 0.5rem 1rem; margin: 1rem 0; border: 1px solid; }
+    .error, .incomplete { background: #fde8e8; border-color: #c00; }
+    .warning { background: #fff6dd; border-color: #c90; }
+  </style>
+</head>
+<body>
+  <form method="get" action="/">
+    <label>Start <input type="date" name="start" value="{{ start }}"></label>
+    <label>End <input type="date" name="end" value="{{ end }}"></label>
+    <button type="submit">Show</button>
+  </form>
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
+
+  {% if statement %}
+    <h1>{{ statement.company }}</h1>
+    <h2>Income Statement</h2>
+    <p>For the period {{ statement.start | long_date }} to {{ statement.end | long_date }}<br>({{ statement.currency }})</p>
+
+    <table>
+      {% for section in statement.sections %}
+        <tr class="heading"><td colspan="2">{{ section.title }}</td></tr>
+        {% for account in section.accounts %}
+          <tr class="account">
+            <td>{{ account.number }} {{ account.name }}</td>
+            <td class="amount">{{ account.amount | money }}</td>
+          </tr>
+        {% endfor %}
+        <tr class="total">
+          <td>{% if section.key == "revenue" %}Net revenue{% else %}Total {{ section.title | lower }}{% endif %}</td>
+          <td class="amount">{{ section.total | money }}</td>
+        </tr>
+        {% if section.key == "cogs" %}
+          <tr class="result"><td>Gross profit</td><td class="amount">{{ statement.gross_profit | money }}</td></tr>
+        {% elif section.key == "operating_expenses" %}
+          <tr class="result"><td>{% if statement.operating_income < 0 %}Operating loss{% else %}Operating income{% endif %}</td><td class="amount">{{ statement.operating_income | money }}</td></tr>
+        {% endif %}
+      {% endfor %}
+      <tr class="result net"><td>{% if statement.net_income < 0 %}Net loss{% else %}Net income{% endif %}</td><td class="amount">{{ statement.net_income | money }}</td></tr>
+    </table>
+  {% endif %}
+</body>
+</html>

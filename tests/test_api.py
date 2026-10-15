@@ -65,3 +65,34 @@ def test_start_after_end_is_422_with_reason():
     response = get_json("2026-03-31", "2026-01-01")
     assert response.status_code == 422
     assert response.json()["detail"] == "start must be on or before end."
+
+
+# --- The page --------------------------------------------------------------------------
+
+def test_page_defaults_to_q1_with_accountant_labels():
+    response = client.get("/")
+    assert response.status_code == 200
+    page = response.text
+    for text in ["Northwind Coffee Roasters", "For the period January 1, 2026 to March 31, 2026",
+                 "Net revenue", "37,850.50", "(800.25)", "Total cost of goods sold", "Gross profit",
+                 "Total operating expenses", "Operating loss", "(44,522.32)", "Net loss", "(44,480.14)"]:
+        assert text in page, text
+
+
+def test_page_says_income_when_positive():
+    page = client.get("/", params={"start": "2026-04-01", "end": "2026-04-30"}).text
+    assert "Net income" in page and "Operating income" in page and "9,100.00" in page
+
+
+def test_page_escapes_html_in_names():
+    assert "Sales Returns &amp; Discounts" in client.get("/").text
+
+
+@pytest.mark.parametrize("params", [{"start": "2026-02-30", "end": "2026-03-31"},
+                                    {"start": "2026-01-01"},
+                                    {"start": "", "end": ""},
+                                    {"start": "2026-03-31", "end": "2026-01-01"}])
+def test_page_shows_date_errors_instead_of_a_statement(params):
+    response = client.get("/", params=params)
+    assert response.status_code == 422
+    assert 'class="error"' in response.text and "Net loss" not in response.text
