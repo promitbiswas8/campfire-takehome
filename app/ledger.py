@@ -61,7 +61,7 @@ class JournalEntry:
 class DataWarning:
     entry_id: str | None
     entry_date: date | None  # None when the date is unreadable: the warning applies to every range
-    kind: str  # "skipped", "unbalanced" or "advisory"
+    kind: str  # "skipped", "unbalanced", "duplicate" or "advisory"
     message: str
     affects_completeness: bool
 
@@ -239,15 +239,20 @@ def _load_line(raw: object, accounts: dict[str, Account]) -> tuple[Line | None, 
 
 
 def _duplicate_id_warnings(entries: list[JournalEntry]) -> list[DataWarning]:
+    """Every copy is counted as recorded. Two posted copies may be one entry counted twice."""
     counts = Counter(entry.id for entry in entries)
-    return [
-        DataWarning(
-            entry.id,
-            entry.date,
-            "advisory",
-            f"{entry.id} appears {counts[entry.id]} times. All posted copies are counted.",
-            False,
-        )
-        for entry in entries
-        if counts[entry.id] > 1
-    ]
+    posted_counts = Counter(entry.id for entry in entries if entry.status == "posted")
+    warnings = []
+    for entry in entries:
+        if counts[entry.id] < 2:
+            continue
+        if posted_counts[entry.id] > 1:
+            message = (
+                f"{entry.id} appears {counts[entry.id]} times, {posted_counts[entry.id]} of them posted. "
+                "All posted copies are counted, so it may be counted twice."
+            )
+            warnings.append(DataWarning(entry.id, entry.date, "duplicate", message, entry.status == "posted"))
+        else:
+            message = f"{entry.id} appears {counts[entry.id]} times. Only one copy is posted, so it is counted once."
+            warnings.append(DataWarning(entry.id, entry.date, "advisory", message, False))
+    return warnings

@@ -63,7 +63,8 @@ class Ledger:       company: str; currency: str
 | `ledger.json` missing or not JSON | **App refuses to start** |
 | Chart of accounts broken: duplicate account number, unknown type or subtype, incompatible type/subtype | **App refuses to start** |
 | Posted entry whose debits != credits | Included as recorded, warned; affected statements marked incomplete |
-| Duplicate entry id; a line with 0.00 on both sides | Included, warned |
+| Duplicate entry id with two or more posted copies | All included, warned; affected statements marked incomplete (one copy may be an accidental double entry) |
+| Duplicate entry id with only one posted copy; a line with 0.00 on both sides | Included, warned |
 | Bad/negative amount, line with both debit and credit, unknown account, unknown status, bad or missing date, missing fields, fewer than two lines | **Whole entry** excluded, warned |
 
 Allowed type/subtype combinations are revenue with `operating_revenue`, `contra_revenue`,
@@ -78,12 +79,13 @@ entry date is in its range, plus any whose date is unreadable.
 `IncomeStatement.is_complete` is false when any applicable warning affects completeness:
 - A whole entry was skipped and its status is posted, unknown, or unreadable.
 - An included posted entry is unbalanced.
+- Two or more posted entries share an id, so one may be counted twice.
 - A data failure has an unreadable date: conservatively flag every range.
 
 Ordinary draft/void exclusions are informational and never make a statement incomplete.
 Malformed entries with a readable date and a known draft/void status may generate warnings
-but do not affect completeness. Duplicate-id and zero-on-both-sides warnings remain
-advisory. Here, "incomplete" also covers included unbalanced posted data: the warning must
+but do not affect completeness. A duplicate id with only one posted copy, and a line
+with 0.00 on both sides, are advisory. Here, "incomplete" also covers included unbalanced posted data: the warning must
 explain that the report is unreliable even though that entry was included.
 
 ## Computation (`statement.py`)

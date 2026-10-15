@@ -313,6 +313,16 @@ def test_skipped_draft_with_readable_date_does_not_affect_completeness():
     assert february.is_complete and len(february.warnings) == 1
 
 
+def test_duplicate_posted_ids_make_the_range_incomplete():
+    ledger = ledger_with(
+        entry("JE-1", "2026-02-10", [line("1100", debit="5.00"), line("4000", credit="5.00")]),
+        entry("JE-1", "2026-02-10", [line("1100", debit="5.00"), line("4000", credit="5.00")]),
+    )
+    february = statement("2026-02-01", "2026-02-28", ledger)
+    assert amount(february, "4000") == Decimal("10.00")  # both counted, as recorded
+    assert not february.is_complete and february.has_duplicate_entries
+
+
 def test_ordinary_drafts_and_voids_do_not_affect_completeness():
     result = statement("2026-01-01", "2026-03-31")
     assert result.excluded_entries and result.is_complete

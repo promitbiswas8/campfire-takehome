@@ -26,8 +26,8 @@ bonus accrual pending approval. If approved, the net loss becomes (49,480.14).
 - **Bad data is never hidden.** The app refuses to start only if the data can't be trusted
   at all: missing or invalid JSON, or a broken chart of accounts (a duplicate number, an
   unknown type or subtype, or a type that doesn't fit its subtype, which would give
-  contradictory signs). A readable but wrong entry (posted and unbalanced) is included and
-  warned. An unreadable entry (an amount like `NaN`, `1e3` or `-5.00`, an unknown account
+  contradictory signs). A readable but wrong entry (posted and unbalanced, or two posted
+  entries sharing an id, which may be one entry counted twice) is included and warned. An unreadable entry (an amount like `NaN`, `1e3` or `-5.00`, an unknown account
   or status, a bad date, too few lines) is left out whole and warned. When a warning could
   change the totals, `is_complete` is false and the page shows a banner. Only posted
   entries must balance.

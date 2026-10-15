@@ -72,11 +72,13 @@ def test_unbalanced_draft_is_not_warned():
     assert len(ledger.entries) == 1 and ledger.warnings == ()
 
 
-def test_duplicate_entry_ids_are_all_included_and_warned():
+def test_duplicate_posted_ids_are_all_included_and_affect_completeness():
+    # One copy may be an accidental double entry (like JE-009 before it was voided).
     ledger = ledger_with(entry("JE-1", "2026-01-05", BALANCED), entry("JE-1", "2026-01-06", BALANCED))
     assert len(ledger.entries) == 2
-    assert [w.kind for w in ledger.warnings] == ["advisory", "advisory"]
-    assert not any(w.affects_completeness for w in ledger.warnings)
+    assert [w.kind for w in ledger.warnings] == ["duplicate", "duplicate"]
+    assert all(w.affects_completeness for w in ledger.warnings)
+    assert "may be counted twice" in ledger.warnings[0].message
 
 
 def test_line_with_zero_on_both_sides_is_included_and_warned():
@@ -177,7 +179,9 @@ def test_amount_too_long_to_be_exact_is_excluded():
     assert len(ok.entries) == 1
 
 
-def test_duplicate_id_warning_does_not_claim_void_copies_count():
+def test_duplicate_id_with_one_posted_copy_is_advisory():
+    # Only the posted copy counts, so nothing is counted twice.
     ledger = ledger_with(entry("JE-1", "2026-01-05", BALANCED), entry("JE-1", "2026-01-06", BALANCED, status="void"))
-    assert all("All copies are included" not in w.message for w in ledger.warnings)
-    assert all("posted copies are counted" in w.message for w in ledger.warnings)
+    assert [w.kind for w in ledger.warnings] == ["advisory", "advisory"]
+    assert not any(w.affects_completeness for w in ledger.warnings)
+    assert all("counted once" in w.message for w in ledger.warnings)

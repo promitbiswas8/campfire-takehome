@@ -1,5 +1,7 @@
 """HTTP layer: response shape, decimal strings, date validation, page labels."""
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -105,9 +107,14 @@ def test_json_drill_down_and_excluded_entries():
     assert [e["id"] for e in body["excluded_entries"]] == ["JE-009", "JE-019", "JE-025"]
 
 
-def test_page_shows_drill_down_and_excluded_entries():
+def test_page_shows_drill_down_under_the_right_account():
     page = client.get("/").text
-    assert "JE-018" in page and "Not included: 1 draft, 2 void" in page
+    software = re.search(r"<summary>6200 Software</summary>(.*?)</details>", page, re.S).group(1)
+    assert "JE-018" in software and "1,199.97" in software
+    assert "JE-020" in software and "(100.00)" in software
+    # Each entry touches one P&L account, so it appears once, under that account only.
+    assert page.count("JE-018") == 1 and page.count("JE-020") == 1
+    assert "Not included: 1 draft, 2 void" in page
 
 
 def test_page_escapes_html_in_memos(monkeypatch):
@@ -135,3 +142,13 @@ def test_incomplete_statement_banner(monkeypatch):
     page = client.get("/", params={"start": "2026-01-01", "end": "2026-01-31"}).text
     assert "Incomplete statement: some entries could not be included" in page
     assert "Incomplete statement: included posted entries do not balance" in page
+
+
+def test_duplicate_posted_ids_banner(monkeypatch):
+    monkeypatch.setattr(main, "ledger", ledger_with(
+        entry("JE-1", "2026-01-05", [line("1100", debit="5.00"), line("4000", credit="5.00")]),
+        entry("JE-1", "2026-01-05", [line("1100", debit="5.00"), line("4000", credit="5.00")]),
+    ))
+    assert get_json("2026-01-01", "2026-01-31").json()["is_complete"] is False
+    page = client.get("/", params={"start": "2026-01-01", "end": "2026-01-31"}).text
+    assert "Incomplete statement: some posted entries share an id and may be counted twice" in page

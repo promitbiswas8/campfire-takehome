@@ -64,6 +64,7 @@ class IncomeStatement:
     is_complete: bool
     has_skipped_entries: bool
     has_unbalanced_entries: bool
+    has_duplicate_entries: bool
 
     def section(self, key: str) -> Section:
         return next(section for section in self.sections if section.key == key)
@@ -133,6 +134,7 @@ def compute_income_statement(ledger: Ledger, start: date, end: date) -> IncomeSt
             warning.kind == "skipped" and warning.affects_completeness for warning in warnings
         ),
         has_unbalanced_entries=any(warning.kind == "unbalanced" for warning in warnings),
+        has_duplicate_entries=any(warning.kind == "duplicate" for warning in warnings),
     )
 
 

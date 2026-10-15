@@ -35,6 +35,7 @@
       <div class="warning incomplete">
         {% if statement.has_skipped_entries %}<p><strong>Incomplete statement: some entries could not be included.</strong></p>{% endif %}
         {% if statement.has_unbalanced_entries %}<p><strong>Incomplete statement: included posted entries do not balance.</strong></p>{% endif %}
+        {% if statement.has_duplicate_entries %}<p><strong>Incomplete statement: some posted entries share an id and may be counted twice.</strong></p>{% endif %}
       </div>
     {% endif %}
     {% if statement.warnings %}
